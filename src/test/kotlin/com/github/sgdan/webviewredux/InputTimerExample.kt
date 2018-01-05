@@ -8,7 +8,6 @@ import kotlinx.html.*
 import kotlinx.html.dom.create
 import mu.KotlinLogging
 import org.w3c.dom.Node
-import tornadofx.*
 import java.lang.Thread.sleep
 
 private val log = KotlinLogging.logger {}
@@ -27,7 +26,7 @@ data class InputState(
         val entered: String? = null
 )
 
-class InputTimerExample : App() {
+class InputTimerExample : Application() {
 
     fun view(state: InputState): Node = createDoc().create.html {
         body {

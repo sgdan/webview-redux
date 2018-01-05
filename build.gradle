@@ -1,0 +1,118 @@
+// see example at https://github.com/thombergs/diffparser/blob/master/build.gradle
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.2.10'
+    id 'com.jfrog.artifactory' version '4.6.0'
+    id 'com.jfrog.bintray' version '1.8.0'
+    id 'maven-publish'
+    id 'org.jetbrains.dokka' version '0.9.15'
+}
+
+repositories {
+    mavenLocal()
+    jcenter()
+}
+
+// run gradle with '-Dsnapshot=true' to automatically append '-SNAPSHOT' to the version
+version = '0.0.1' + (Boolean.valueOf(System.getProperty('snapshot')) ? '-SNAPSHOT' : '')
+group = 'com.github.sgdan'
+sourceCompatibility = 1.8
+
+ext {
+    bintrayUser = System.getProperty('bintray.user')
+    bintrayKey = System.getProperty('bintray.key')
+    buildNumber = System.getProperty('build.number')
+}
+
+kotlin { experimental { coroutines 'enable' } }
+
+dependencies {
+    compile 'org.jetbrains.kotlin:kotlin-stdlib:1.2.10'
+    compile 'org.jetbrains.kotlinx:kotlinx-coroutines-javafx:0.21'
+
+    testCompile 'junit:junit:4.12'
+    testCompile 'io.vavr:vavr-kotlin:0.9.2'
+    testCompile 'org.slf4j:slf4j-simple:1.7.25'
+    testCompile 'io.github.microutils:kotlin-logging:1.4.9'
+    testCompile 'org.jetbrains.kotlinx:kotlinx-html-jvm:0.6.6'
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+
+publishing {
+    publications {
+        mavenPublication(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            artifact javadocJar
+            pom.withXml {
+                asNode().with {
+                    appendNode 'name', 'Webview Redux'
+                    appendNode 'description', 'A simple redux-like framework for the JavaFx WebView component'
+                    appendNode 'url', 'https://github.com/sgdan/webview-redux'
+                    appendNode('licenses').with {
+                        appendNode 'name', 'MIT License'
+                        appendNode 'url', 'https://raw.githubusercontent.com/sgdan/webview-redux/master/LICENSE'
+                    }
+                }
+            }
+        }
+    }
+}
+
+artifactory {
+    contextUrl = 'http://oss.jfrog.org'
+    publish {
+        repository {
+            repoKey = 'oss-snapshot-local'
+            username = 'bintrayUser'
+            password = 'bintrayKey'
+        }
+        defaults {
+            publications('mavenPublication')
+            publishArtifacts = true
+            publishPom = true
+            properties = [
+                    'build.number': buildNumber,
+                    'build.name'  : 'webview-redux'
+            ]
+        }
+    }
+    resolve {
+        repoKey = 'jcenter'
+    }
+    clientConfig.info.setBuildNumber(buildNumber)
+    clientConfig.info.setBuildName('diffparser')
+}
+
+bintray {
+    user = bintrayUser
+    key = bintrayKey
+    publications = ['mavenPublication']
+
+    pkg {
+        repo = 'maven-releases'
+        name = 'webview-redux'
+        licenses = ['MIT']
+        vcsUrl = 'https://github.com/sgdan/webview-redux'
+        version {
+            name = project.version
+            desc = "build ${buildNumber}"
+            released = new Date()
+        }
+    }
+
+    publish = true
+}

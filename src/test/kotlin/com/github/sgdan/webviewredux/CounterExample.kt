@@ -7,7 +7,6 @@ import kotlinx.html.*
 import kotlinx.html.dom.create
 import mu.KotlinLogging
 import org.w3c.dom.Node
-import tornadofx.*
 
 private val log = KotlinLogging.logger {}
 
@@ -15,7 +14,7 @@ enum class CounterAction {
     INCREMENT, DECREMENT
 }
 
-class CounterExample : App() {
+class CounterExample : Application() {
     val css = this::class.java.classLoader.getResource("CounterExample.css")
             .toURI().toURL().toExternalForm()
 
