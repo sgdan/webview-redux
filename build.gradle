@@ -85,31 +85,25 @@ artifactory {
     publish {
         repository {
             repoKey = 'oss-snapshot-local'
-            username = 'bintrayUser'
-            password = 'bintrayKey'
+            username = bintrayUser
+            password = bintrayKey
         }
         defaults {
             publications('mavenPublication')
             publishArtifacts = true
             publishPom = true
-            properties = [
-                    'build.number': buildNumber,
-                    'build.name'  : 'webview-redux'
-            ]
         }
     }
     resolve {
         repoKey = 'jcenter'
     }
     clientConfig.info.setBuildNumber(buildNumber)
-    clientConfig.info.setBuildName('diffparser')
 }
 
 bintray {
     user = bintrayUser
     key = bintrayKey
     publications = ['mavenPublication']
-
     pkg {
         repo = 'maven-releases'
         name = 'webview-redux'
@@ -121,6 +115,5 @@ bintray {
             released = new Date()
         }
     }
-
     publish = true
 }
