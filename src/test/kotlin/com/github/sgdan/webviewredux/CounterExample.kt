@@ -2,6 +2,7 @@ package com.github.sgdan.webviewredux
 
 import javafx.application.Application
 import javafx.scene.Scene
+import javafx.scene.web.WebView
 import javafx.stage.Stage
 import kotlinx.html.*
 import kotlinx.html.dom.create
@@ -14,6 +15,7 @@ enum class CounterAction {
     INCREMENT, DECREMENT
 }
 
+
 class CounterExample : Application() {
     val css = this::class.java.classLoader.getResource("CounterExample.css")
             .toURI().toURL().toExternalForm()
@@ -24,6 +26,10 @@ class CounterExample : Application() {
             link {
                 rel = "stylesheet"
                 href = css
+            }
+            script {
+                type = "text/javascript"
+                src = "https://getfirebug.com/firebug-lite.js#startOpened"
             }
         }
         body {
@@ -53,6 +59,7 @@ class CounterExample : Application() {
     override fun start(stage: Stage) {
         // Initialise the redux handling
         val redux = Redux(
+                WebView(),
                 0, // initial state
                 ::view,
                 ::update,

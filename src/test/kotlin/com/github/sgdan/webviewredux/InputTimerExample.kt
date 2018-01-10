@@ -9,6 +9,7 @@ import kotlinx.html.dom.create
 import mu.KotlinLogging
 import org.w3c.dom.Node
 import java.lang.Thread.sleep
+import javafx.scene.web.WebView
 
 private val log = KotlinLogging.logger {}
 
@@ -77,6 +78,7 @@ class InputTimerExample : Application() {
 
     override fun start(stage: Stage) {
         val redux = Redux(
+                WebView(),
                 InputState(),
                 ::view,
                 ::update,

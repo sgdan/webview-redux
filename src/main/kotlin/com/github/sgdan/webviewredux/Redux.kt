@@ -39,6 +39,7 @@ import javax.xml.transform.stream.StreamResult
  * user's changes e.g. in text field, or component focus.
  */
 class Redux<S, A>(
+        val webview: WebView,
         val initialState: S,
 
         // fn to convert a given state to a DOM node suitable for display
@@ -55,9 +56,6 @@ class Redux<S, A>(
     private var state = initialState
     private var currentView = view(initialState)
     private var doc: Node? = null
-
-    // The WebView used to host this UI
-    val webview = WebView()
 
     init {
         // render initial view
@@ -162,6 +160,10 @@ internal fun copy(ref: Node?, src: Node, dst: Node) {
  */
 private fun discard(n: Node?) {
     n?.nextSibling?.let { discard(it) }
+
+    // don't discard firebug frame so it can be used for debugging
+    if ("FirebugUI" == n?.attributes?.getNamedItem("id")?.nodeValue) return
+
     n?.let { n.parentNode.removeChild(n) }
 }
 
