@@ -1,14 +1,17 @@
 package com.github.sgdan.webviewredux
 
+import javafx.animation.AnimationTimer
 import javafx.concurrent.Worker
 import javafx.scene.web.WebView
 import kotlinx.coroutines.experimental.channels.Channel
 import kotlinx.coroutines.experimental.javafx.JavaFx
 import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.runBlocking
 import netscape.javascript.JSObject
 import org.w3c.dom.Node
 import org.w3c.dom.Text
 import java.io.StringWriter
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
@@ -57,6 +60,16 @@ class Redux<S, A>(
     private var currentView = view(initialState)
     private var doc: Node? = null
 
+    /** Set when a new view should be generated */
+    private val refresh = AtomicBoolean(false)
+
+    /** Set the refresh flag every frame cycle */
+    private val timer = object : AnimationTimer() {
+        override fun handle(now: Long) {
+            refresh.set(true)
+        }
+    }.apply { start() }
+
     init {
         // render initial view
         launch(JavaFx) {
@@ -85,13 +98,15 @@ class Redux<S, A>(
                 val nextState = update(action, currentState)
                 state = nextState
 
-                // update the view based on the new state
-                val prevView = currentView
-                val nextView = view(nextState)
-                launch(JavaFx) {
-                    doc?.let { copy(prevView, nextView, it) }
+                // update the view based on the new state, only once per frame refresh
+                if (refresh.getAndSet(false)) {
+                    val prevView = currentView
+                    val nextView = view(nextState)
+                    launch(JavaFx) {
+                        doc?.let { copy(prevView, nextView, it) }
+                    }
+                    currentView = nextView
                 }
-                currentView = nextView
             }
         }
     }
@@ -100,7 +115,7 @@ class Redux<S, A>(
      * Actions go through the channel to be processed in order
      */
     fun perform(action: A) {
-        launch { actions.send(action) }
+        runBlocking { actions.send(action) }
     }
 
     /**
@@ -187,8 +202,7 @@ private fun copyChildren(ref: Node?, src: Node, dst: Node) {
         val type = srcChild.nodeType
         val refChild = ref?.firstChild?.let { findMatching(it, name, type, srcChild.textContent) }
         val dstSibling = dst.childNodes?.item(0)
-                // if there's no dst sibling, create one
-                ?: dst.appendChild(createNode(dst, name, type))
+                ?: dst.appendChild(createNode(dst, name, type)) // create one if necessary
         copySibling(refChild, srcChild, dstSibling)
     }
 }
@@ -245,8 +259,8 @@ private fun copyAttributes(ref: Node?, from: Node, to: Node) {
         val srcName = srcItem.nodeName
         val dstItem = toAtt.getNamedItem(srcName)
                 ?: to.ownerDocument.createAttribute(srcName).apply {
-            toAtt.setNamedItem(this)
-        }
+                    toAtt.setNamedItem(this)
+                }
         if (srcItem != dstItem) {
             val refItem = refAtt?.getNamedItem(srcName)
             if (refItem == null || refItem.nodeValue != srcItem.nodeValue) {
@@ -258,8 +272,9 @@ private fun copyAttributes(ref: Node?, from: Node, to: Node) {
     // remove attributes not in src
     if (toAtt == null) return
     0.until(toAtt.length).forEach {
-        val dstName = toAtt.item(it).nodeName
-        fromAtt.getNamedItem(dstName) ?: toAtt.removeNamedItem(dstName)
+        toAtt.item(it)?.nodeName?.let {
+            fromAtt.getNamedItem(it) ?: toAtt.removeNamedItem(it)
+        }
     }
 }
 
