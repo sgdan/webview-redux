@@ -5,13 +5,11 @@ See [CounterExample.kt](src/test/kotlin/com/github/sgdan/webviewredux/CounterExa
 basic usage.
 
 ### Redux class
-The [Redux.kt](src/main/kotlin/com/github/sgdan/webviewredux/Redux.kt) class can
-be instantiated by providing:
+The [Redux.kt](src/main/kotlin/com/github/sgdan/webviewredux/Redux.kt) class can be instantiated by providing:
 - a WebView component to use as display
 - the initial state: State
 - a view function: (State) -> View
 - an update function: (State, Action) -> State
-- a function to create an action given name and params: (String, Array) -> Action 
 
 ### View function
 The view function can use the [kotlinx.html DSL](https://github.com/Kotlin/kotlinx.html) to
@@ -24,6 +22,8 @@ fun view(state: Int): Node = createDoc().create.html {
         }
     }
 ```
+An Animation timer is used so that the view function won't be used more than once per screen
+refresh cycle.
 
 ### Events
 The Redux class adds a `performAction` function to the JavaScript
@@ -39,7 +39,6 @@ button {
     onClick = "performAction('ENTER', document.getElementById('input1').value, 'arg');"
 }
 ```
-The `createAction` function passed to Redux in the constructor is used to create an appropriate action.
 
 Events can also be triggered from a background thread or co-routine:
 ```

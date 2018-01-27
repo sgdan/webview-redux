@@ -8,6 +8,7 @@ import kotlinx.coroutines.experimental.javafx.JavaFx
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
 import netscape.javascript.JSObject
+import org.w3c.dom.Document
 import org.w3c.dom.Node
 import org.w3c.dom.Text
 import java.io.StringWriter
@@ -20,8 +21,8 @@ import javax.xml.transform.stream.StreamResult
 /**
  * Provide a simple redux-like framework for a JavaFX WebView component.
  *
- * State and Action types (S and A) must be defined by calling code and should
- * ideally be immutable data classes. A "virtual dom" is maintained using
+ * The State type S must be defined by calling code and should
+ * ideally be an immutable data class. A "virtual dom" is maintained using
  * the Node instance returned by the view function. Unfortunately Node
  * implementations are mutable but here they're treated as if they
  * are immutable.
@@ -41,43 +42,35 @@ import javax.xml.transform.stream.StreamResult
  * value differs from the reference value. This prevents overwriting the
  * user's changes e.g. in text field, or component focus.
  */
-class Redux<S, A>(
-        val webview: WebView,
-        val initialState: S,
+class Redux<S>(
+        private val webview: WebView,
+        private val initialState: S,
 
         // fn to convert a given state to a DOM node suitable for display
-        val view: (S) -> Node,
+        private val view: (S) -> Node,
 
         // fn to update the state by performing an action
-        val update: (A, S) -> S,
-
-        // fn to create an action given a name and optional arguments
-        // (used to trigger actions from JavaScript by name)
-        val createAction: (String, Array<Any>?) -> A
+        private val update: (Action, S) -> S
 ) {
-    private val actions = Channel<A>()
+    private val actions = Channel<Action>()
+    private val engine = webview.engine
+
     private var state = initialState
     private var currentView = view(initialState)
-    private var doc: Node? = null
 
     /** Set when a new view should be generated */
     private val refresh = AtomicBoolean(false)
 
-    /** Set the refresh flag every frame cycle */
-    private val timer = object : AnimationTimer() {
-        override fun handle(now: Long) {
-            refresh.set(true)
-        }
-    }.apply { start() }
-
     init {
-        // render initial view
+        renderInitialView()
+        launchActionProcessor()
+        launchTimer()
+    }
+
+    private fun renderInitialView() {
         launch(JavaFx) {
-            val engine = webview.engine
             engine.loadWorker.stateProperty().addListener { _, _, newValue ->
                 if (newValue == Worker.State.SUCCEEDED) {
-                    doc = engine.document.documentElement
-
                     // add hook for actions
                     val window = engine.executeScript("window") as JSObject
                     window.setMember("actions", hook)
@@ -86,10 +79,11 @@ class Redux<S, A>(
                     window.eval("function performAction() { actions.perform(arguments) }")
                 }
             }
-            webview.engine.loadContent(toHtml(currentView))
+            engine.loadContent(toHtml(currentView))
         }
+    }
 
-        // action processor
+    private fun launchActionProcessor() {
         launch {
             while (!actions.isClosedForReceive) {
                 // perform the action and update the state
@@ -103,7 +97,7 @@ class Redux<S, A>(
                     val prevView = currentView
                     val nextView = view(nextState)
                     launch(JavaFx) {
-                        doc?.let { copy(prevView, nextView, it) }
+                        engine.document?.documentElement?.let { copy(prevView, nextView, it) }
                     }
                     currentView = nextView
                 }
@@ -111,23 +105,32 @@ class Redux<S, A>(
         }
     }
 
+    /** Set refresh flag each frame cycle */
+    private fun launchTimer() {
+        // set refresh flag each frame cycle
+        object : AnimationTimer() {
+            override fun handle(now: Long) {
+                refresh.set(true)
+            }
+        }.apply { start() }
+    }
+
     /**
      * Actions go through the channel to be processed in order
      */
-    fun perform(action: A) {
+    fun perform(action: Action) {
         runBlocking { actions.send(action) }
     }
+
+    fun <E : Enum<E>> perform(enumVal: E, arg: Any? = null)
+            = perform(Action.from(enumVal, arg))
 
     /**
      * Provide hook for javascript code to perform an action
      */
     private val hook = object {
         fun perform(args: JSObject) {
-            val len = args.getMember("length")
-            if (len !is Int || len == 0) throw Exception("Arguments needed")
-            val name = args.getSlot(0).toString()
-            val params = 1.until(len).map { args.getSlot(it) }.toTypedArray()
-            this@Redux.perform(createAction(name, params))
+            this@Redux.perform(Action.from(args))
         }
     }
 }
@@ -137,7 +140,7 @@ private val builder = DocumentBuilderFactory.newInstance().newDocumentBuilder()
 /**
  * Convenience method for creating a new document
  */
-fun createDoc() = builder.newDocument()
+fun createDoc(): Document = builder.newDocument()
 
 /**
  * Update dst structure using values from src. Don't update values if there's

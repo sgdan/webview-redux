@@ -1,35 +1,27 @@
 package com.github.sgdan.webviewredux
 
+import com.github.sgdan.webviewredux.InputTimerExample.ActionType.*
 import javafx.application.Application
 import javafx.scene.Scene
+import javafx.scene.web.WebView
 import javafx.stage.Stage
+import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
 import kotlinx.html.*
 import kotlinx.html.dom.create
-import mu.KotlinLogging
 import org.w3c.dom.Node
-import java.lang.Thread.sleep
-import javafx.scene.web.WebView
-
-private val log = KotlinLogging.logger {}
-
-enum class InputActionType {
-    ENTER, CLEAR, FLIP
-}
-
-data class InputAction(
-        val type: InputActionType,
-        val params: Array<Any>? = null
-)
-
-data class InputState(
-        val big: Boolean = false,
-        val entered: String? = null
-)
 
 class InputTimerExample : Application() {
+    enum class ActionType {
+        ENTER, CLEAR, FLIP
+    }
 
-    fun view(state: InputState): Node = createDoc().create.html {
+    data class State(
+            val big: Boolean = false,
+            val entered: String? = null
+    )
+
+    fun view(state: State): Node = createDoc().create.html {
         body {
             h1 { +"Input Timer Example" }
             +"Updates from timer should not affect content or focus of input fields"
@@ -61,39 +53,33 @@ class InputTimerExample : Application() {
         }
     }
 
-    fun update(action: Any, state: InputState): InputState {
-        if (action is InputAction) {
-            when (action.type) {
-                InputActionType.CLEAR -> return state.copy(entered = null)
-                InputActionType.FLIP -> return state.copy(big = !state.big)
-                InputActionType.ENTER -> return state.copy(
-                        entered = action.params?.map { it.toString().trim() }
-                                ?.filter { !it.isEmpty() }
-                                ?.joinToString(separator = " and ")
-                )
-            }
-        }
-        throw Exception("Unexpected action: $action")
+    fun update(action: Action, state: State) = when (action.to<ActionType>()) {
+        CLEAR -> state.copy(entered = null)
+        FLIP -> state.copy(big = !state.big)
+        ENTER -> state.copy(
+                entered = action.params?.map { it.toString().trim() }
+                        ?.filter { !it.isEmpty() }
+                        ?.joinToString(separator = " and ")
+        )
+        else -> throw Exception("Unexpected action: $action")
     }
 
     override fun start(stage: Stage) {
+        val webview = WebView()
         val redux = Redux(
-                WebView(),
-                InputState(),
+                webview,
+                State(),
                 ::view,
-                ::update,
-                { name, params ->
-                    InputAction(InputActionType.valueOf(name), params)
-                }
+                ::update
         )
-        stage.scene = Scene(redux.webview)
+        stage.scene = Scene(webview)
         stage.show()
 
-        // timer to send flip actions every 1s
+        // timer to send flip actions
         launch {
             while (true) {
-                sleep(1000)
-                redux.perform(InputAction(InputActionType.FLIP))
+                delay(500)
+                redux.perform(FLIP)
             }
         }
     }

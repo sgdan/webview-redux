@@ -6,17 +6,13 @@ import javafx.scene.web.WebView
 import javafx.stage.Stage
 import kotlinx.html.*
 import kotlinx.html.dom.create
-import mu.KotlinLogging
 import org.w3c.dom.Node
 
-private val log = KotlinLogging.logger {}
-
-enum class CounterAction {
-    INCREMENT, DECREMENT
-}
-
-
 class CounterExample : Application() {
+    enum class CounterAction {
+        INCREMENT, DECREMENT
+    }
+
     val css = this::class.java.classLoader.getResource("CounterExample.css")
             .toURI().toURL().toExternalForm()
 
@@ -49,24 +45,22 @@ class CounterExample : Application() {
         }
     }
 
-    fun update(action: Any, state: Int): Int =
-            when (action) {
-                CounterAction.INCREMENT -> state + 1
-                CounterAction.DECREMENT -> state - 1
-                else -> throw Exception("Unexpected action: $action")
-            }
+    fun update(action: Action, state: Int): Int = when (action.to<CounterAction>()) {
+        CounterAction.INCREMENT -> state + 1
+        CounterAction.DECREMENT -> state - 1
+        else -> throw Exception("Unexpected action: $action")
+    }
 
     override fun start(stage: Stage) {
-        // Initialise the redux handling
-        val redux = Redux(
-                WebView(),
+        // Initialise the view and redux object
+        val webview = WebView()
+        Redux(webview,
                 0, // initial state
                 ::view,
-                ::update,
-                { name, _ -> CounterAction.valueOf(name) }
-        )
+                ::update)
 
-        stage.scene = Scene(redux.webview)
+        // Show the view
+        stage.scene = Scene(webview)
         stage.show()
     }
 }

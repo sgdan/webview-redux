@@ -1,6 +1,6 @@
 // see example at https://github.com/thombergs/diffparser/blob/master/build.gradle
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.2.10'
+    id 'org.jetbrains.kotlin.jvm' version '1.2.21'
     id 'com.jfrog.artifactory' version '4.6.0'
     id 'com.jfrog.bintray' version '1.8.0'
     id 'maven-publish'
@@ -26,7 +26,7 @@ ext {
 kotlin { experimental { coroutines 'enable' } }
 
 dependencies {
-    compile 'org.jetbrains.kotlin:kotlin-stdlib:1.2.10'
+    compile 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
     compile 'org.jetbrains.kotlinx:kotlinx-coroutines-javafx:0.21'
 
     testCompile 'junit:junit:4.12'

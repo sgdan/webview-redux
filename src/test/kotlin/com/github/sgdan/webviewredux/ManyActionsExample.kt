@@ -1,6 +1,6 @@
 package com.github.sgdan.webviewredux
 
-import com.github.sgdan.webviewredux.ManyActionsExample.Action.*
+import com.github.sgdan.webviewredux.ManyActionsExample.TestAction.*
 import javafx.application.Application
 import javafx.scene.Scene
 import javafx.scene.web.WebView
@@ -9,26 +9,21 @@ import kotlinx.coroutines.experimental.delay
 import kotlinx.coroutines.experimental.launch
 import kotlinx.html.*
 import kotlinx.html.dom.create
-import mu.KotlinLogging
 import org.w3c.dom.Node
 
-private val log = KotlinLogging.logger {}
-
-data class Counter(
-        val running: Boolean = false,
-        val counter: Int = 0,
-        val frame: Int = 0)
-
 class ManyActionsExample : Application() {
-    enum class Action {
+    data class State(
+            val running: Boolean = false,
+            val counter: Int = 0,
+            val frame: Int = 0)
+
+    enum class TestAction {
         START, STOP, INCREMENT, NEXT
     }
 
     private val max = 20
 
-    var redux: Redux<Counter, Action>? = null
-
-    fun view(state: Counter): Node = createDoc().create.html {
+    fun view(state: State): Node = createDoc().create.html {
         body {
             h1 { +"Many Actions Example" }
             br
@@ -71,26 +66,25 @@ class ManyActionsExample : Application() {
         }
     }
 
-    fun update(action: Any, state: Counter): Counter =
-            when (action) {
-                START -> state.copy(running = true)
-                STOP -> state.copy(running = false)
-                INCREMENT -> state.copy(counter = state.counter + 1)
-                NEXT -> when {
-                    !state.running -> state
-                    state.frame == max -> state.copy(frame = 0)
-                    else -> state.copy(frame = state.frame + 1)
-                }
-                else -> throw Exception("Unexpected action: $action")
-            }
+    fun update(action: Action, state: State): State = when (action.to<TestAction>()) {
+        START -> state.copy(running = true)
+        STOP -> state.copy(running = false)
+        INCREMENT -> state.copy(counter = state.counter + 1)
+        NEXT -> when {
+            !state.running -> state
+            state.frame == max -> state.copy(frame = 0)
+            else -> state.copy(frame = state.frame + 1)
+        }
+        else -> throw Exception("Unexpected action: $action")
+    }
 
     override fun start(stage: Stage) {
-        redux = Redux(
-                WebView(),
-                Counter(), // initial state
+        val webview = WebView()
+        val redux = Redux(
+                webview,
+                State(), // initial state
                 ::view,
-                ::update,
-                { name, _ -> Action.valueOf(name) }
+                ::update
         )
 
         // generate endless increment actions
@@ -104,7 +98,7 @@ class ManyActionsExample : Application() {
             }
         }
 
-        stage.scene = Scene(redux?.webview)
+        stage.scene = Scene(webview)
         stage.show()
     }
 }
