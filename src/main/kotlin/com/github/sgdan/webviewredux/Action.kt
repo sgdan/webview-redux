@@ -1,60 +1,57 @@
 package com.github.sgdan.webviewredux
 
 import netscape.javascript.JSObject
+import kotlin.reflect.KFunction
 
 /**
- * Represents a named action with optional parameter of any type.
+ * Represents a named action with optional arguments
  */
-class Action(
+data class Action(
         /** The name of this action, optionally matching an enum */
         val name: String,
 
-        /** An argument of any type, use list or array for multiple action parameters */
-        val arg: Any? = null
+        /** Optional arguments */
+        val args: List<Any?> = emptyList()
 ) {
     companion object {
-        /** Create using enum value */
-        fun <E : Enum<E>> from(value: E, arg: Any? = null) = Action(value.name, arg)
-
         /** Create from JavaScript object, assume first argument is name */
         fun from(jso: JSObject): Action {
             val len = jso.getMember("length")
             if (len !is Int || len == 0) throw Exception("Arguments needed")
             val name = jso.getSlot(0).toString()
-            val params = 1.until(len).map { jso.getSlot(it) }.toTypedArray()
-            return Action(name, params)
+            val args = 1.until(len).map { jso.getSlot(it) }
+            return Action(name, args)
         }
     }
 
-    /** Allow easy access to parameters */
-    val params: List<Any?> = when (arg) {
-        null -> emptyList()
-        is Array<*> -> arg.toList()
-        is List<*> -> arg
-        else -> emptyList()
-    }
+    /** Vararg constructor alternative */
+    constructor(name: Any, vararg args: Any?) : this(name.toString(), args.toList())
 
-    /** @return the argument as the given class or null if it's the wrong type */
-    fun <T> arg(c: Class<T>): T? = convert(arg, c)
+    /** @return the ith argument or null if there isn't one */
+    fun get(i: Int) = args.getOrNull(i)
 
-    /** @return the ith parameter or null if there isn't one */
-    fun get(i: Int) = params.getOrNull(i)
-
-    /** @return the ith parameter as the given type or null if not possible */
-    fun <T> get(i: Int, c: Class<T>): T? = convert(get(i), c)
-
-    private fun <T> convert(obj: Any?, c: Class<T>): T? = when {
-        obj == null -> null
-        obj::class.java == c -> c.cast(obj)
-        else -> null
+    /** @return the ith argument as the given type or null if not possible */
+    fun <T> get(i: Int, c: Class<T>): T? = get(i)?.let {
+        if (c.isInstance(it)) c.cast(it) else null
     }
 
     /**
-     * Convert action name to Enum,
+     * Convert action name to Enum
      */
     inline fun <reified T : kotlin.Enum<T>> to(): T? = try {
         java.lang.Enum.valueOf(T::class.java, name)
     } catch (e: Exception) {
         null
+    }
+
+    /**
+     * Convenience function to call the provided method which is assumed to
+     * take the initial argument (usually the state) followed by the parameters
+     * of this action.
+     */
+    inline fun <reified R> call(initial: Any? = null, fn: KFunction<R>): R = try {
+        fn.call(initial, *args.toTypedArray())
+    } catch (e: IllegalArgumentException) {
+        throw IllegalArgumentException("Call failed using $this", e)
     }
 }

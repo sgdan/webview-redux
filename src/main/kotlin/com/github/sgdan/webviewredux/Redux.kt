@@ -122,8 +122,8 @@ class Redux<S>(
         runBlocking { actions.send(action) }
     }
 
-    fun <E : Enum<E>> perform(enumVal: E, arg: Any? = null)
-            = perform(Action.from(enumVal, arg))
+    /** Convenience method to perform an action */
+    fun perform(name: Any, vararg args: Any?) = perform(Action(name, *args))
 
     /**
      * Provide hook for javascript code to perform an action

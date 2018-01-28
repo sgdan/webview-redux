@@ -1,6 +1,5 @@
 package com.github.sgdan.webviewredux
 
-import io.vavr.kotlin.hashMap
 import kotlinx.html.*
 import kotlinx.html.dom.create
 import mu.KotlinLogging
@@ -11,7 +10,7 @@ import org.w3c.dom.Node
 private val log = KotlinLogging.logger {}
 
 class NodeReplicatorTest : Assert() {
-    private val testDocs = hashMap(
+    private val testDocs = mapOf(
             "page" to createDoc().create.html {
                 head {
                     title("Document title")

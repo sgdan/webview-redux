@@ -13,13 +13,20 @@ import org.w3c.dom.Node
 
 class InputTimerExample : Application() {
     enum class ActionType {
-        ENTER, CLEAR, FLIP
+        FLIP, UPDATE
     }
 
     data class State(
             val big: Boolean = false,
-            val entered: String? = null
+            val name: String = "Mary",
+            val count: Int = 6,
+            val pet: String = "turtle"
     )
+
+    /**
+     * @return JavaScript to get value of named field
+     */
+    private fun valueOf(name: String) = "document.getElementById('$name').value"
 
     fun view(state: State): Node = createDoc().create.html {
         body {
@@ -27,42 +34,62 @@ class InputTimerExample : Application() {
             +"Updates from timer should not affect content or focus of input fields"
             br
             br
-            +"Input 1:"
+
+            // All 3 field types send the same event. A bit redundant but useful to demonstrate
+            // the call function of the Action class to marshal the arguments.
+            val command = "performAction('$UPDATE',${valueOf("name")},${valueOf("count")},${valueOf("pet")})"
+            +"Name:"
             textInput {
-                id = "input1"
+                id = "name"
+                onChange = command
+                value = state.name
             }
             br
-            +"Input 2:"
-            textInput {
-                id = "input2"
+            +"Count:"
+            select {
+                id = "count"
+                1.until(10).forEach {
+                    option {
+                        +"$it"
+                        value = it.toString()
+                        if (it == state.count) selected = true
+                    }
+                }
+                onChange = command
             }
             br
-            button {
-                +"Enter"
-                onClick = "performAction('ENTER', document.getElementById('input1').value, document.getElementById('input2').value);"
+            +"Pet:"
+            select {
+                id = "pet"
+                listOf("dog", "cat", "turtle").forEach {
+                    option {
+                        +"$it"
+                        value = it
+                        if (it == state.pet) selected = true
+                    }
+                }
+                onChange = command
             }
-            button {
-                +"Clear"
-                onClick = "performAction('CLEAR');"
-            }
+
             br
 
-            val enteredText = state.entered ?: "Nothing entered"
+            val enteredText = "%s has %d %s%s"
+                    .format(state.name, state.count, state.pet, if (state.count > 1) "s" else "")
             if (state.big) h1 { +enteredText }
             else h2 { +enteredText }
         }
     }
 
     fun update(action: Action, state: State) = when (action.to<ActionType>()) {
-        CLEAR -> state.copy(entered = null)
+        UPDATE -> action.call(state, ::updateMsg)
         FLIP -> state.copy(big = !state.big)
-        ENTER -> state.copy(
-                entered = action.params?.map { it.toString().trim() }
-                        ?.filter { !it.isEmpty() }
-                        ?.joinToString(separator = " and ")
-        )
         else -> throw Exception("Unexpected action: $action")
     }
+
+    fun updateMsg(state: State, name: String, count: String, pet: String) = state.copy(
+            name = name,
+            count = count.toIntOrNull() ?: state.count,
+            pet = pet)
 
     override fun start(stage: Stage) {
         val webview = WebView()
