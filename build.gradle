@@ -29,10 +29,10 @@ dependencies {
     compile 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
     compile 'org.jetbrains.kotlin:kotlin-reflect'
     compile 'org.jetbrains.kotlinx:kotlinx-coroutines-javafx:0.21'
+    compile 'io.github.microutils:kotlin-logging:1.4.9'
 
     testCompile 'junit:junit:4.12'
     testCompile 'org.slf4j:slf4j-simple:1.7.25'
-    testCompile 'io.github.microutils:kotlin-logging:1.4.9'
     testCompile 'org.jetbrains.kotlinx:kotlinx-html-jvm:0.6.6'
 }
 

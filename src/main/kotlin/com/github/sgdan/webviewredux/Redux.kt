@@ -3,20 +3,23 @@ package com.github.sgdan.webviewredux
 import javafx.animation.AnimationTimer
 import javafx.concurrent.Worker
 import javafx.scene.web.WebView
-import kotlinx.coroutines.experimental.channels.Channel
-import kotlinx.coroutines.experimental.javafx.JavaFx
+import kotlinx.coroutines.experimental.channels.actor
 import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
+import mu.KotlinLogging
 import netscape.javascript.JSObject
 import org.w3c.dom.Document
 import org.w3c.dom.Node
 import org.w3c.dom.Text
 import java.io.StringWriter
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.transform.TransformerFactory
 import javax.xml.transform.dom.DOMSource
 import javax.xml.transform.stream.StreamResult
+import kotlinx.coroutines.experimental.javafx.JavaFx as UI
+
+private val log = KotlinLogging.logger {}
 
 /**
  * Provide a simple redux-like framework for a JavaFX WebView component.
@@ -52,23 +55,28 @@ class Redux<S>(
         // fn to update the state by performing an action
         private val update: (Action, S) -> S
 ) {
-    private val actions = Channel<Action>()
+    private val actionProcessor = actor<Action> {
+        var currentState = state.get()
+        for (action in channel) {
+            // perform the action and update the state
+            val nextState = update(action, currentState)
+            state.set(nextState)
+            currentState = nextState
+        }
+    }
+
     private val engine = webview.engine
 
-    private var state = initialState
+    private val state = AtomicReference(initialState)
     private var currentView = view(initialState)
-
-    /** Set when a new view should be generated */
-    private val refresh = AtomicBoolean(false)
 
     init {
         renderInitialView()
-        launchActionProcessor()
         launchTimer()
     }
 
     private fun renderInitialView() {
-        launch(JavaFx) {
+        launch(UI) {
             engine.loadWorker.stateProperty().addListener { _, _, newValue ->
                 if (newValue == Worker.State.SUCCEEDED) {
                     // add hook for actions
@@ -83,34 +91,21 @@ class Redux<S>(
         }
     }
 
-    private fun launchActionProcessor() {
-        launch {
-            while (!actions.isClosedForReceive) {
-                // perform the action and update the state
-                val action = actions.receive()
-                val currentState = state
-                val nextState = update(action, currentState)
-                state = nextState
-
-                // update the view based on the new state, only once per frame refresh
-                if (refresh.getAndSet(false)) {
-                    val prevView = currentView
-                    val nextView = view(nextState)
-                    launch(JavaFx) {
-                        engine.document?.documentElement?.let { copy(prevView, nextView, it) }
-                    }
-                    currentView = nextView
-                }
-            }
-        }
-    }
-
-    /** Set refresh flag each frame cycle */
+    /** Refresh view if required on JavaFX pulse */
     private fun launchTimer() {
-        // set refresh flag each frame cycle
         object : AnimationTimer() {
+            var previousState: S? = null
+
             override fun handle(now: Long) {
-                refresh.set(true)
+                val currentState = state.get()
+                if (currentState != previousState) {
+                    // update the view based on the new state
+                    val prevView = currentView
+                    val nextView = view(currentState)
+                    engine.document?.documentElement?.let { copy(prevView, nextView, it) }
+                    currentView = nextView
+                    previousState = currentState
+                }
             }
         }.apply { start() }
     }
@@ -119,7 +114,7 @@ class Redux<S>(
      * Actions go through the channel to be processed in order
      */
     fun perform(action: Action) {
-        runBlocking { actions.send(action) }
+        runBlocking { actionProcessor.send(action) }
     }
 
     /** Convenience method to perform an action */
@@ -130,7 +125,8 @@ class Redux<S>(
      */
     private val hook = object {
         fun perform(args: JSObject) {
-            this@Redux.perform(Action.from(args))
+            val action = Action.from(args) // UI thread
+            launch { this@Redux.perform(action) } // don't block the UI thread
         }
     }
 }

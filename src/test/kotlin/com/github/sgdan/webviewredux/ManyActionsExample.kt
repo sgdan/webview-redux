@@ -93,7 +93,7 @@ class ManyActionsExample : Application() {
         // timer for next frame of simple animation
         launch {
             while (true) {
-                redux?.perform(NEXT)
+                redux.perform(NEXT)
                 delay(50)
             }
         }
