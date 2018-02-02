@@ -13,7 +13,7 @@ repositories {
 }
 
 // run gradle with '-Dsnapshot=true' to automatically append '-SNAPSHOT' to the version
-version = '0.0.1' + (Boolean.valueOf(System.getProperty('snapshot')) ? '-SNAPSHOT' : '')
+version = '0.0.2' + (Boolean.valueOf(System.getProperty('snapshot')) ? '-SNAPSHOT' : '')
 group = 'com.github.sgdan'
 sourceCompatibility = 1.8
 
