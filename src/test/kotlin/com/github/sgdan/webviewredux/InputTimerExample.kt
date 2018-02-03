@@ -13,15 +13,22 @@ import org.w3c.dom.Node
 
 class InputTimerExample : Application() {
     enum class ActionType {
-        FLIP, UPDATE
+        FLIP, UPDATE, CYCLE
     }
 
     data class State(
             val big: Boolean = false,
             val name: String = "Mary",
             val count: Int = 6,
-            val pet: String = "turtle"
-    )
+            val pet: String = "turtle",
+            val colour: String = "blue"
+    ) {
+        fun cycle() = copy(colour = when (colour) {
+            "blue" -> "green"
+            "green" -> "red"
+            else -> "blue"
+        })
+    }
 
     /**
      * @return JavaScript to get value of named field
@@ -73,16 +80,20 @@ class InputTimerExample : Application() {
 
             br
 
-            val enteredText = "%s has %d %s%s"
-                    .format(state.name, state.count, state.pet, if (state.count > 1) "s" else "")
-            if (state.big) h1 { +enteredText }
-            else h2 { +enteredText }
+            span {
+                style = "color:${state.colour}"
+                val enteredText = "%s has %d %s%s"
+                        .format(state.name, state.count, state.pet, if (state.count > 1) "s" else "")
+                if (state.big) h1 { +enteredText }
+                else h2 { +enteredText }
+            }
         }
     }
 
     fun update(action: Action, state: State) = when (action.to<ActionType>()) {
-        UPDATE -> action.call(state, ::updateMsg)
-        FLIP -> state.copy(big = !state.big)
+        UPDATE -> action.call(state, ::updateMsg) // call method with state as first parameter
+        FLIP -> action.call(state, State::flip) // call extension method of State
+        CYCLE -> action.call(state, State::cycle) // call member of State
         else -> throw Exception("Unexpected action: $action")
     }
 
@@ -109,8 +120,18 @@ class InputTimerExample : Application() {
                 redux.perform(FLIP)
             }
         }
+
+        // timer to send cycle actions
+        launch {
+            while (true) {
+                delay(200)
+                redux.perform(CYCLE)
+            }
+        }
     }
 }
+
+fun InputTimerExample.State.flip() = copy(big = !big)
 
 fun main(vararg args: String) {
     Application.launch(InputTimerExample::class.java)
