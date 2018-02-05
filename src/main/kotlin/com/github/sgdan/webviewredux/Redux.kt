@@ -55,6 +55,10 @@ class Redux<S>(
         // fn to update the state by performing an action
         private val update: (Action, S) -> S
 ) {
+    private val engine = webview.engine
+
+    private val state = AtomicReference(initialState)
+
     private val actionProcessor = actor<Action> {
         var currentState = state.get()
         for (action in channel) {
@@ -65,9 +69,6 @@ class Redux<S>(
         }
     }
 
-    private val engine = webview.engine
-
-    private val state = AtomicReference(initialState)
     private var currentView = view(initialState)
 
     init {
