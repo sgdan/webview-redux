@@ -10,18 +10,24 @@ import kotlinx.coroutines.experimental.launch
 import kotlinx.html.*
 import kotlinx.html.dom.create
 import org.w3c.dom.Node
+import java.util.*
 
 class ManyActionsExample : Application() {
     data class State(
-            val running: Boolean = false,
+            val running: Boolean = true,
             val counter: Int = 0,
-            val frame: Int = 0)
+            val frame: Int = 0,
+            val jobs: Set<Any> = emptySet())
 
     enum class TestAction {
-        START, STOP, INCREMENT, NEXT
+        START, STOP, INCREMENT, NEXT, BLOCK, BEGIN, END
     }
 
+    private var redux: Redux<State>? = null
+
     private val max = 20
+
+    private val rnd = Random()
 
     fun view(state: State): Node = createDoc().create.html {
         body {
@@ -38,7 +44,24 @@ class ManyActionsExample : Application() {
                 onClick = "performAction('STOP');"
             }
             br
-            state.frame.let { +"${"-".repeat(it)}_${"-".repeat(max - it)}" }
+            pre {
+                state.frame.let { +"${"-".repeat(it)}_${"-".repeat(max - it)}" }
+            }
+            br
+            +"""
+                Background jobs launched on the common pool that call the perform(Action) method can block
+                trying to add actions to the processor channel. If actions are not processed in a separate
+                thread, everything will deadlock. The action processor actor has its own single thread context
+                to avoid this.
+            """
+            br
+            button {
+                +"Block"
+                onClick = "performAction('BLOCK');"
+            }
+            +"Add 10 background jobs to make sure processing doesn't block"
+            br
+            +"Num jobs running: ${state.jobs.size}"
             br
             br
             +"""
@@ -70,17 +93,31 @@ class ManyActionsExample : Application() {
         START -> state.copy(running = true)
         STOP -> state.copy(running = false)
         INCREMENT -> state.copy(counter = state.counter + 1)
+        BLOCK -> {
+            0.until(9).forEach {
+                // launch bg tasks on the common pool
+                launch {
+                    val id = Object()
+                    redux?.perform(BEGIN, id)
+                    delay(rnd.nextInt(10000)) // wait for some time less than 10s
+                    redux?.perform(END, id)
+                }
+            }
+            state.copy()
+        }
         NEXT -> when {
             !state.running -> state
             state.frame == max -> state.copy(frame = 0)
             else -> state.copy(frame = state.frame + 1)
         }
+        BEGIN -> action.call(state, State::begin)
+        END -> action.call(state, State::end)
         else -> throw Exception("Unexpected action: $action")
     }
 
     override fun start(stage: Stage) {
         val webview = WebView()
-        val redux = Redux(
+        redux = Redux(
                 webview,
                 State(), // initial state
                 ::view,
@@ -93,7 +130,7 @@ class ManyActionsExample : Application() {
         // timer for next frame of simple animation
         launch {
             while (true) {
-                redux.perform(NEXT)
+                redux?.perform(NEXT)
                 delay(50)
             }
         }
@@ -102,6 +139,9 @@ class ManyActionsExample : Application() {
         stage.show()
     }
 }
+
+fun ManyActionsExample.State.begin(id: Any) = copy(jobs = jobs + id)
+fun ManyActionsExample.State.end(id: Any) = copy(jobs = jobs - id)
 
 fun main(vararg args: String) {
     Application.launch(ManyActionsExample::class.java)

@@ -5,6 +5,7 @@ import javafx.concurrent.Worker
 import javafx.scene.web.WebView
 import kotlinx.coroutines.experimental.channels.actor
 import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.newSingleThreadContext
 import kotlinx.coroutines.experimental.runBlocking
 import mu.KotlinLogging
 import netscape.javascript.JSObject
@@ -59,7 +60,9 @@ class Redux<S>(
 
     private val state = AtomicReference(initialState)
 
-    private val actionProcessor = actor<Action> {
+    private val actionProcessor = actor<Action>(
+            context = newSingleThreadContext("Action Processor")
+    ) {
         var currentState = state.get()
         for (action in channel) {
             // perform the action and update the state

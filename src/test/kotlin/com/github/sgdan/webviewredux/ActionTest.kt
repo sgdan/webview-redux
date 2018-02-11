@@ -56,9 +56,17 @@ class ActionTest : Assert() {
         assertEquals("something", str)
         var arr: Array<String>? = three.get(0, Array<String>::class.java)
         assertNull(arr)
-        var int: Integer? = two.get(1, Integer::class.java)
+        var int = two.get(1, Integer::class.java)
         assertEquals(2, int)
         str = two.get(1, String::class.java)
+        assertNull(str)
+
+        // check Kotlin class converter also works
+        str = three.get(0, String::class)
+        assertEquals("something", str)
+        var kint: Int? = two.get(1, Int::class)
+        assertEquals(2, kint)
+        str = two.get(1, String::class)
         assertNull(str)
 
         // check conversion to enum value works

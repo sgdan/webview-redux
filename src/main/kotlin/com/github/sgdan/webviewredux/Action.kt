@@ -1,7 +1,9 @@
 package com.github.sgdan.webviewredux
 
 import netscape.javascript.JSObject
+import kotlin.reflect.KClass
 import kotlin.reflect.KFunction
+import kotlin.reflect.full.safeCast
 
 /**
  * Represents a named action with optional arguments
@@ -34,6 +36,9 @@ data class Action(
     fun <T> get(i: Int, c: Class<T>): T? = get(i)?.let {
         if (c.isInstance(it)) c.cast(it) else null
     }
+
+    /** @return the ith argument as the given type or null if not possible */
+    fun <T : Any> get(i: Int, k: KClass<T>): T? = k.safeCast(get(i))
 
     /**
      * Convert action name to Enum
